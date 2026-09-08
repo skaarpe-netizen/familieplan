@@ -24,6 +24,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
   </div>
 }
 
+function ProtectedLayout() {
+  const [ready, setReady] = useState(!supabase)
+  const [authenticated, setAuthenticated] = useState(!supabase)
+
+  useEffect(() => {
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthenticated(Boolean(data.session))
+      setReady(true)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthenticated(Boolean(session))
+      setReady(true)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  if (!ready) return <main className="loading-page">Indlæser Familieplanen...</main>
+  return authenticated ? <AppShell><Outlet /></AppShell> : <Navigate to="/" replace />
+}
+
 function CalendarFilters() {
   const { visibleCalendars, toggleCalendar } = useUiStore()
   const calendars = useFamilyStore((state) => state.calendars)
@@ -105,4 +126,4 @@ function Login() {
   return <main className="login-page"><div className="login-card"><span className="brand-mark large">F</span><p className="eyebrow">Familiens fælles overblik</p><h1>Velkommen til<br /><em>Familieplanen</em></h1><p>Alt det, I skal vide om dagen, samlet på ét sted.</p><label className="login-label">Emailadresse<input className="login-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="familie@example.com" /></label><button className="google-button" onClick={signIn}><span>→</span> Send login-link</button><small>{status || (supabase ? 'Du modtager et sikkert login-link på email.' : 'Demo-tilstand er aktiv.')}</small></div></main>
 }
 
-export function App() { return <Routes><Route path="/" element={<Login />} /><Route element={<AppShell><Outlet /></AppShell>}><Route path="/dashboard" element={<Dashboard />} /><Route path="/admin" element={<Admin />} /></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes> }
+export function App() { return <Routes><Route path="/" element={<Login />} /><Route element={<ProtectedLayout />}><Route path="/dashboard" element={<Dashboard />} /><Route path="/admin" element={<Admin />} /></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes> }
