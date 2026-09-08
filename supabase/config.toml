@@ -1,0 +1,10 @@
+project_id = "familieplanen"
+
+[functions.sync-calendars]
+verify_jwt = true
+[functions.sync-weather]
+verify_jwt = true
+[functions.sync-meal-plan]
+verify_jwt = true
+[functions.generate-meal-image]
+verify_jwt = true

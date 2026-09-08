@@ -1,0 +1,10 @@
+{
+  "name": "Familieplanen",
+  "short_name": "Familieplanen",
+  "start_url": "/dashboard",
+  "display": "fullscreen",
+  "background_color": "#101217",
+  "theme_color": "#101217",
+  "orientation": "landscape",
+  "icons": []
+}
