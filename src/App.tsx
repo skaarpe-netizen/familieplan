@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, CloudSun, CookingPot, ExternalLink, LogOut, MessageCircle, Plus, Settings2, Sun, ThermometerSun, Wind } from 'lucide-react'
-import { events } from './features/calendar/mockData'
 import { formatDay } from './lib/date'
+import { useCalendarData } from './hooks/useCalendarData'
 import { supabase } from './lib/supabase'
+import { upsertUserProfile } from './services/profileService'
 import { useFamilyStore } from './store/family'
 import { useUiStore } from './store/ui'
 import type { CalendarColor } from './types'
@@ -30,13 +31,15 @@ function ProtectedLayout() {
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setAuthenticated(Boolean(data.session))
+      if (data.session?.user) await upsertUserProfile(data.session.user).catch(() => undefined)
       setReady(true)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthenticated(Boolean(session))
       setReady(true)
+      if (session?.user) void upsertUserProfile(session.user).catch(() => undefined)
     })
     return () => listener.subscription.unsubscribe()
   }, [])
@@ -45,9 +48,8 @@ function ProtectedLayout() {
   return authenticated ? <AppShell><Outlet /></AppShell> : <Navigate to="/" replace />
 }
 
-function CalendarFilters() {
+function CalendarFilters({ calendars }: { calendars: ReturnType<typeof useFamilyStore.getState>['calendars'] }) {
   const { visibleCalendars, toggleCalendar } = useUiStore()
-  const calendars = useFamilyStore((state) => state.calendars)
   return <div className="filter-row" aria-label="Kalenderfiltre">
     {calendars.map((calendar) => <button key={calendar.id} className={`filter-chip ${visibleCalendars.includes(calendar.id) ? 'selected' : ''} ${colorClasses[calendar.color]}`} onClick={() => toggleCalendar(calendar.id)}>
       <span className="chip-dot" />{calendar.name}
@@ -57,12 +59,12 @@ function CalendarFilters() {
 
 function CalendarPanel() {
   const { calendarMode, setCalendarMode, visibleCalendars } = useUiStore()
-  const calendars = useFamilyStore((state) => state.calendars)
-  const visibleEvents = useMemo(() => events.filter((event) => visibleCalendars.includes(event.calendarId)), [visibleCalendars])
+  const { calendars, events } = useCalendarData()
+  const visibleEvents = useMemo(() => events.filter((event) => visibleCalendars.includes(event.calendarId)), [events, visibleCalendars])
   const getCalendar = (id: string) => calendars.find((calendar) => calendar.id === id)!
   return <section className="panel calendar-panel">
     <div className="panel-header calendar-header"><div><p className="eyebrow">Familien samlet</p><h2>Kalender</h2></div><div className="segmented"><button className={calendarMode === 'five-days' ? 'active' : ''} onClick={() => setCalendarMode('five-days')}>5 dage</button><button className={calendarMode === 'day' ? 'active' : ''} onClick={() => setCalendarMode('day')}>Dag</button></div></div>
-    <CalendarFilters />
+    <CalendarFilters calendars={calendars} />
     {calendarMode === 'five-days' ? <div className="days-grid">{[0, 1, 2, 3, 4].map((offset) => <div className="day-column" key={offset}><div className={`day-heading ${offset === 0 ? 'today' : ''}`}><span>{formatDay(offset)}</span><strong>{offset === 0 ? 'I dag' : offset === 1 ? 'I morgen' : `+${offset} dage`}</strong></div><div className="events-stack">{visibleEvents.filter((event) => Number(event.date.slice(-2)) === 8 + offset).map((event) => { const calendar = getCalendar(event.calendarId); return <div className={`event-card ${colorClasses[calendar.color]}`} key={event.id}><div className="event-time">{event.time}</div><strong>{event.title}</strong><small>{calendar.name}{event.location ? ` · ${event.location}` : ''}</small></div> })}</div></div>)}</div> : <div className="day-view"><div className="day-view-title"><ChevronLeft size={20} /><strong>Tirsdag 8. september</strong><ChevronRight size={20} /></div>{visibleEvents.filter((event) => event.date === '2026-09-08').map((event) => { const calendar = getCalendar(event.calendarId); return <div className="day-event" key={event.id}><span className={`person-dot ${colorClasses[calendar.color]}`} /><span className="day-event-time">{event.time}</span><strong>{event.title}</strong><small>{calendar.name}</small></div> })}</div>}
   </section>
 }
