@@ -1,4 +1,5 @@
 import type { CalendarEvent, FamilyCalendar } from '../types'
+import { mergeOverlappingEvents } from '../features/calendar/normalizeEvents'
 import { supabase } from '../lib/supabase'
 
 export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
@@ -17,16 +18,24 @@ export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
 
 export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]> {
   if (!supabase) return []
-  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,location,calendar_id,calendars!inner(user_id)').eq('calendars.user_id', userId).order('starts_at')
+  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,ends_at,location,calendar_id,calendars!inner(user_id)').eq('calendars.user_id', userId).order('starts_at')
   if (error) throw error
-  return (data ?? []).map((event) => {
-    const startsAt = new Date(event.starts_at)
+  const normalized = mergeOverlappingEvents((data ?? []).map((event) => ({
+    externalId: event.id,
+    title: event.title,
+    startsAt: event.starts_at,
+    endsAt: event.ends_at,
+    calendarId: event.calendar_id,
+    location: event.location,
+  })))
+  return normalized.map((event) => {
+    const startsAt = new Date(event.startsAt)
     return {
-      id: event.id,
+      id: event.externalId,
       title: event.title,
       date: startsAt.toISOString().slice(0, 10),
       time: startsAt.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }),
-      calendarId: event.calendar_id,
+      calendarId: event.calendarId ?? '',
       location: event.location ?? undefined,
     }
   })
