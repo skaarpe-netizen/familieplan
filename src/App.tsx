@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, ChevronLeft, ChevronRight, CloudSun, CookingPot, ExternalLink, LogOut, MessageCircle, Plus, RefreshCw, Settings2, Sun, ThermometerSun, Wind } from 'lucide-react'
-import { formatDay } from './lib/date'
+import { dateForOffset, formatDay } from './lib/date'
 import { useCalendarData } from './hooks/useCalendarData'
 import { supabase } from './lib/supabase'
 import { createCalendar as createCalendarRecord, deleteCalendar as deleteCalendarRecord, updateCalendar as updateCalendarRecord } from './services/calendarService'
@@ -64,11 +64,12 @@ function CalendarPanel() {
   const { calendarMode, setCalendarMode, visibleCalendars } = useUiStore()
   const { calendars, events } = useCalendarData()
   const visibleEvents = useMemo(() => events.filter((event) => visibleCalendars.includes(event.calendarId)), [events, visibleCalendars])
+  const today = new Date()
   const getCalendar = (id: string) => calendars.find((calendar) => calendar.id === id)!
   return <section className="panel calendar-panel">
     <div className="panel-header calendar-header"><div><p className="eyebrow">Familien samlet</p><h2>Kalender</h2></div><div className="segmented"><button className={calendarMode === 'five-days' ? 'active' : ''} onClick={() => setCalendarMode('five-days')}>5 dage</button><button className={calendarMode === 'day' ? 'active' : ''} onClick={() => setCalendarMode('day')}>Dag</button></div></div>
     <CalendarFilters calendars={calendars} />
-    {calendarMode === 'five-days' ? <div className="days-grid">{[0, 1, 2, 3, 4].map((offset) => <div className="day-column" key={offset}><div className={`day-heading ${offset === 0 ? 'today' : ''}`}><span>{formatDay(offset)}</span><strong>{offset === 0 ? 'I dag' : offset === 1 ? 'I morgen' : `+${offset} dage`}</strong></div><div className="events-stack">{visibleEvents.filter((event) => Number(event.date.slice(-2)) === 8 + offset).map((event) => { const calendar = getCalendar(event.calendarId); if (!calendar) return null; return <div className={`event-card ${colorClasses[calendar.color]}`} key={event.id}><div className="event-time">{event.time}</div><strong>{event.title}</strong><small>{calendar.name}{event.location ? ` · ${event.location}` : ''}</small></div> })}</div></div>)}</div> : <div className="day-view"><div className="day-view-title"><ChevronLeft size={20} /><strong>Tirsdag 8. september</strong><ChevronRight size={20} /></div>{visibleEvents.filter((event) => event.date === '2026-09-08').map((event) => { const calendar = getCalendar(event.calendarId); if (!calendar) return null; return <div className="day-event" key={event.id}><span className={`person-dot ${colorClasses[calendar.color]}`} /><span className="day-event-time">{event.time}</span><strong>{event.title}</strong><small>{calendar.name}</small></div> })}</div>}
+    {calendarMode === 'five-days' ? <div className="days-grid">{[0, 1, 2, 3, 4].map((offset) => <div className="day-column" key={offset}><div className={`day-heading ${offset === 0 ? 'today' : ''}`}><span>{formatDay(offset, today)}</span><strong>{offset === 0 ? 'I dag' : offset === 1 ? 'I morgen' : `+${offset} dage`}</strong></div><div className="events-stack">{visibleEvents.filter((event) => event.date === dateForOffset(offset, today)).map((event) => { const calendar = getCalendar(event.calendarId); if (!calendar) return null; return <div className={`event-card ${colorClasses[calendar.color]}`} key={event.id}><div className="event-time">{event.time}</div><strong>{event.title}</strong><small>{calendar.name}{event.location ? ` · ${event.location}` : ''}</small></div> })}</div></div>)}</div> : <div className="day-view"><div className="day-view-title"><ChevronLeft size={20} /><strong>{formatDay(0, today)}</strong><ChevronRight size={20} /></div>{visibleEvents.filter((event) => event.date === dateForOffset(0, today)).map((event) => { const calendar = getCalendar(event.calendarId); if (!calendar) return null; return <div className="day-event" key={event.id}><span className={`person-dot ${colorClasses[calendar.color]}`} /><span className="day-event-time">{event.time}</span><strong>{event.title}</strong><small>{calendar.name}</small></div> })}</div>}
   </section>
 }
 
