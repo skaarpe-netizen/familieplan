@@ -9,7 +9,7 @@ type FamilyState = {
   messages: FamilyMessage[]
   weather: WeatherSettings
   mealUrl: string
-  addCalendar: (calendar: Omit<FamilyCalendar, 'id'>) => void
+  addCalendar: (calendar: Omit<FamilyCalendar, 'id'> | FamilyCalendar) => void
   updateCalendar: (id: string, calendar: Partial<FamilyCalendar>) => void
   removeCalendar: (id: string) => void
   addMessage: (text: string, author?: string) => void
@@ -23,7 +23,7 @@ export const useFamilyStore = create<FamilyState>()(persist((set) => ({
   messages: initialMessages,
   weather: { city: 'Hørsholm', latitude: 55.88, longitude: 12.50 },
   mealUrl: 'https://calendar.familie.dk/madplan',
-  addCalendar: (calendar) => set((state) => ({ calendars: [...state.calendars, { ...calendar, id: crypto.randomUUID() }] })),
+  addCalendar: (calendar) => set((state) => ({ calendars: [...state.calendars, { ...calendar, id: 'id' in calendar ? calendar.id : crypto.randomUUID() }] })),
   updateCalendar: (id, calendar) => set((state) => ({ calendars: state.calendars.map((item) => item.id === id ? { ...item, ...calendar } : item) })),
   removeCalendar: (id) => set((state) => ({ calendars: state.calendars.filter((calendar) => calendar.id !== id) })),
   addMessage: (text, author = 'Familie') => set((state) => ({ messages: [{ id: crypto.randomUUID(), text, author, createdAt: 'Lige nu' }, ...state.messages] })),
