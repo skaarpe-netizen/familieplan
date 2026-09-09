@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { calendars as initialCalendars, messages as initialMessages } from '../features/calendar/mockData'
 import type { FamilyCalendar, FamilyMessage } from '../types'
 
 type WeatherSettings = { city: string; latitude: number; longitude: number }
@@ -19,10 +18,10 @@ type FamilyState = {
 }
 
 export const useFamilyStore = create<FamilyState>()(persist((set) => ({
-  calendars: initialCalendars,
-  messages: initialMessages,
+  calendars: [],
+  messages: [],
   weather: { city: 'Hørsholm', latitude: 55.88, longitude: 12.50 },
-  mealUrl: 'https://calendar.familie.dk/madplan',
+  mealUrl: '',
   addCalendar: (calendar) => set((state) => ({ calendars: [...state.calendars, { ...calendar, id: 'id' in calendar ? calendar.id : crypto.randomUUID() }] })),
   updateCalendar: (id, calendar) => set((state) => ({ calendars: state.calendars.map((item) => item.id === id ? { ...item, ...calendar } : item) })),
   removeCalendar: (id) => set((state) => ({ calendars: state.calendars.filter((calendar) => calendar.id !== id) })),
