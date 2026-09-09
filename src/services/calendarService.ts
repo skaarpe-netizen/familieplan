@@ -69,13 +69,14 @@ export async function createCalendar(calendar: Omit<FamilyCalendar, 'id'>) {
 
 export async function updateCalendar(id: string, values: Partial<FamilyCalendar>) {
   if (!supabase) return
-  const { error } = await supabase.from('calendars').update({
+  const { data, error } = await supabase.from('calendars').update({
     ...(values.name !== undefined ? { name: values.name } : {}),
     ...(values.color !== undefined ? { color: values.color } : {}),
     ...(values.active !== undefined ? { active: values.active } : {}),
     ...(values.icsUrl !== undefined ? { ics_url: values.icsUrl } : {}),
-  }).eq('id', id)
+  }).eq('id', id).select('id').maybeSingle()
   if (error) throw error
+  if (!data) throw new Error('Kalenderen findes ikke for den aktuelle bruger')
 }
 
 export async function deleteCalendar(id: string) {
