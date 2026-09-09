@@ -1,5 +1,7 @@
 import type { CalendarEvent, FamilyCalendar } from '../types'
 import { mergeOverlappingEvents } from '../features/calendar/normalizeEvents'
+
+const aulaCalendarPrefix = 'https://kalenderlink.aula.dk'
 import { supabase } from '../lib/supabase'
 
 export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
@@ -18,7 +20,7 @@ export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
 
 export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]> {
   if (!supabase) return []
-  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,ends_at,location,calendar_id,calendars!inner(user_id)').eq('calendars.user_id', userId).order('starts_at')
+  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,ends_at,location,calendar_id,calendars!inner(user_id,ics_url)').eq('calendars.user_id', userId).order('starts_at')
   if (error) throw error
   const normalized = mergeOverlappingEvents((data ?? []).map((event) => ({
     externalId: event.id,
@@ -26,6 +28,7 @@ export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]
     startsAt: event.starts_at,
     endsAt: event.ends_at,
     calendarId: event.calendar_id,
+    mergeTeachers: event.calendars[0]?.ics_url.startsWith(aulaCalendarPrefix) ?? false,
     location: event.location,
   })))
   return normalized.map((event) => {

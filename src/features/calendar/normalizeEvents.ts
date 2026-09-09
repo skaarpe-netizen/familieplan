@@ -4,6 +4,7 @@ export type RawCalendarEvent = {
   startsAt: string
   endsAt: string | null
   calendarId?: string
+  mergeTeachers?: boolean
   location?: string | null
   rawData?: Record<string, unknown>
 }
@@ -18,14 +19,15 @@ export function extractSubject(title: string) {
 
 export function mergeOverlappingEvents(events: RawCalendarEvent[]) {
   const groups = new Map<string, RawCalendarEvent[]>()
-  for (const event of events) {
-    const key = `${event.startsAt}|${event.endsAt ?? ''}`
+  const passthrough = events.filter((event) => !event.mergeTeachers)
+  for (const event of events.filter((item) => item.mergeTeachers)) {
+    const key = `${event.calendarId ?? ''}|${event.startsAt}|${event.endsAt ?? ''}`
     const group = groups.get(key) ?? []
     group.push(event)
     groups.set(key, group)
   }
 
-  return [...groups.values()].map((group) => {
+  return [...passthrough, ...[...groups.values()].map((group) => {
     const first = group[0]
     const subjects = [...new Set(group.map((event) => extractSubject(event.title)).filter(Boolean))]
     return {
@@ -34,5 +36,5 @@ export function mergeOverlappingEvents(events: RawCalendarEvent[]) {
       externalId: group.map((event) => event.externalId).join('|'),
       rawData: { mergedEventIds: group.map((event) => event.externalId), sourceTitles: group.map((event) => event.title) },
     }
-  })
+  })]
 }

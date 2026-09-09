@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type ParsedEvent = { external_id: string; title: string; starts_at: string; ends_at: string | null; location: string | null; raw_data: Record<string, string> }
+const aulaCalendarPrefix = 'https://kalenderlink.aula.dk'
 
 function unfoldIcs(text: string) {
   return text.replace(/\r?\n[ \t]/g, '').split(/\r?\n/)
@@ -57,7 +58,8 @@ Deno.serve(async (request) => {
   for (const calendar of calendars ?? []) {
     const response = await fetch(calendar.ics_url)
     if (!response.ok) continue
-    const normalized = mergeEvents(parseEvents(await response.text()))
+    const parsed = parseEvents(await response.text())
+    const normalized = calendar.ics_url.startsWith(aulaCalendarPrefix) ? mergeEvents(parsed) : parsed
     await supabase.from('calendar_events').delete().eq('calendar_id', calendar.id)
     if (normalized.length) {
       const { error } = await supabase.from('calendar_events').insert(normalized.map((event) => ({ ...event, calendar_id: calendar.id })))
