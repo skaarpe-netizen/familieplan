@@ -7,6 +7,7 @@ export type FamilyCalendar = {
   color: CalendarColor
   active: boolean
   source: string
+  icsUrl?: string
 }
 
 export type CalendarEvent = {

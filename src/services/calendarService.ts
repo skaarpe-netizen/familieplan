@@ -15,6 +15,7 @@ export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
     color: calendar.color,
     active: calendar.active,
     source: calendar.source,
+    icsUrl: calendar.ics_url,
   }))
 }
 
@@ -72,6 +73,7 @@ export async function updateCalendar(id: string, values: Partial<FamilyCalendar>
     ...(values.name !== undefined ? { name: values.name } : {}),
     ...(values.color !== undefined ? { color: values.color } : {}),
     ...(values.active !== undefined ? { active: values.active } : {}),
+    ...(values.icsUrl !== undefined ? { ics_url: values.icsUrl } : {}),
   }).eq('id', id)
   if (error) throw error
 }
