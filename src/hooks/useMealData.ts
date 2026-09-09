@@ -14,6 +14,7 @@ export function useMealData() {
     },
     enabled: Boolean(supabase),
     staleTime: 60_000,
+    refetchInterval: 30_000,
   })
-  return { icsUrl: query.data?.icsUrl ?? '', meals: query.data?.meals ?? [], isLoading: query.isLoading }
+  return { icsUrl: query.data?.icsUrl ?? '', meals: query.data?.meals ?? [], isLoading: query.isLoading, isError: query.isError, error: query.error }
 }
