@@ -21,7 +21,12 @@ export async function getCalendars(userId: string): Promise<FamilyCalendar[]> {
 
 export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]> {
   if (!supabase) return []
-  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,ends_at,location,calendar_id,calendars!inner(user_id,ics_url)').eq('calendars.user_id', userId).order('starts_at')
+  const { data: calendars, error: calendarError } = await supabase.from('calendars').select('id,ics_url').eq('user_id', userId).eq('active', true)
+  if (calendarError) throw calendarError
+  if (!calendars?.length) return []
+  const calendarIds = calendars.map((calendar) => calendar.id)
+  const aulaCalendarIds = new Set(calendars.filter((calendar) => calendar.ics_url.startsWith(aulaCalendarPrefix)).map((calendar) => calendar.id))
+  const { data, error } = await supabase.from('calendar_events').select('id,title,starts_at,ends_at,location,calendar_id').in('calendar_id', calendarIds).order('starts_at')
   if (error) throw error
   const normalized = mergeOverlappingEvents((data ?? []).map((event) => ({
     externalId: event.id,
@@ -29,15 +34,17 @@ export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]
     startsAt: event.starts_at,
     endsAt: event.ends_at,
     calendarId: event.calendar_id,
-    mergeTeachers: event.calendars[0]?.ics_url.startsWith(aulaCalendarPrefix) ?? false,
+    mergeTeachers: aulaCalendarIds.has(event.calendar_id),
     location: event.location,
   })))
   return normalized.map((event) => {
     const startsAt = new Date(event.startsAt)
+    const month = String(startsAt.getMonth() + 1).padStart(2, '0')
+    const day = String(startsAt.getDate()).padStart(2, '0')
     return {
       id: event.externalId,
       title: event.title,
-      date: startsAt.toISOString().slice(0, 10),
+      date: `${startsAt.getFullYear()}-${month}-${day}`,
       time: startsAt.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }),
       calendarId: event.calendarId ?? '',
       location: event.location ?? undefined,
