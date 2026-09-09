@@ -2,6 +2,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type ParsedEvent = { external_id: string; title: string; starts_at: string; ends_at: string | null; location: string | null; raw_data: Record<string, string> }
 const aulaCalendarPrefix = 'https://kalenderlink.aula.dk'
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+}
 
 function unfoldIcs(text: string) {
   return text.replace(/\r?\n[ \t]/g, '').split(/\r?\n/)
@@ -47,13 +56,14 @@ function mergeEvents(events: ParsedEvent[]) {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   const authHeader = request.headers.get('Authorization')
-  if (!authHeader) return new Response('Unauthorized', { status: 401 })
+  if (!authHeader) return json({ error: 'Unauthorized' }, 401)
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  if (!user) return json({ error: 'Unauthorized' }, 401)
   const { data: calendars, error: calendarError } = await supabase.from('calendars').select('id,ics_url').eq('user_id', user.id).eq('active', true)
-  if (calendarError) return Response.json({ error: calendarError.message }, { status: 500 })
+  if (calendarError) return json({ error: calendarError.message }, 500)
   let synced = 0
   for (const calendar of calendars ?? []) {
     const response = await fetch(calendar.ics_url)
@@ -63,9 +73,9 @@ Deno.serve(async (request) => {
     await supabase.from('calendar_events').delete().eq('calendar_id', calendar.id)
     if (normalized.length) {
       const { error } = await supabase.from('calendar_events').insert(normalized.map((event) => ({ ...event, calendar_id: calendar.id })))
-      if (error) return Response.json({ error: error.message }, { status: 500 })
+      if (error) return json({ error: error.message }, 500)
       synced += normalized.length
     }
   }
-  return Response.json({ ok: true, userId: user.id, synced, syncedAt: new Date().toISOString() })
+  return json({ ok: true, userId: user.id, synced, syncedAt: new Date().toISOString() })
 })
