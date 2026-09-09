@@ -58,11 +58,16 @@ function mergeEvents(events: ParsedEvent[]) {
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   const authHeader = request.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'Unauthorized' }, 401)
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return json({ error: 'Unauthorized' }, 401)
-  const { data: calendars, error: calendarError } = await supabase.from('calendars').select('id,ics_url').eq('user_id', user.id).eq('active', true)
+  const cronSecret = Deno.env.get('SYNC_CRON_SECRET')
+  const isCron = Boolean(cronSecret && request.headers.get('x-sync-cron-secret') === cronSecret)
+  if (!authHeader && !isCron) return json({ error: 'Unauthorized' }, 401)
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const adminClient = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey)
+  const client = isCron ? adminClient : createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader! } } })
+  const { data: { user } } = isCron ? { data: { user: null } } : await client.auth.getUser()
+  if (!isCron && !user) return json({ error: 'Unauthorized' }, 401)
+  const calendarQuery = client.from('calendars').select('id,ics_url').eq('active', true)
+  const { data: calendars, error: calendarError } = user ? await calendarQuery.eq('user_id', user.id) : await calendarQuery
   if (calendarError) return json({ error: calendarError.message }, 500)
   let synced = 0
   for (const calendar of calendars ?? []) {
@@ -70,12 +75,12 @@ Deno.serve(async (request) => {
     if (!response.ok) continue
     const parsed = parseEvents(await response.text())
     const normalized = calendar.ics_url.startsWith(aulaCalendarPrefix) ? mergeEvents(parsed) : parsed
-    await supabase.from('calendar_events').delete().eq('calendar_id', calendar.id)
+    await adminClient.from('calendar_events').delete().eq('calendar_id', calendar.id)
     if (normalized.length) {
-      const { error } = await supabase.from('calendar_events').insert(normalized.map((event) => ({ ...event, calendar_id: calendar.id })))
+      const { error } = await adminClient.from('calendar_events').insert(normalized.map((event) => ({ ...event, calendar_id: calendar.id })))
       if (error) return json({ error: error.message }, 500)
       synced += normalized.length
     }
   }
-  return json({ ok: true, userId: user.id, synced, syncedAt: new Date().toISOString() })
+  return json({ ok: true, userId: user?.id ?? null, synced, syncedAt: new Date().toISOString() })
 })
