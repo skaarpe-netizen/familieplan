@@ -31,3 +31,41 @@ export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]
     }
   })
 }
+
+async function currentUserId() {
+  if (!supabase) return null
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
+
+export async function createCalendar(calendar: Omit<FamilyCalendar, 'id'>) {
+  if (!supabase) return null
+  const userId = await currentUserId()
+  if (!userId) throw new Error('Du skal være logget ind for at oprette en kalender')
+  const { data, error } = await supabase.from('calendars').insert({
+    user_id: userId,
+    name: calendar.name,
+    color: calendar.color,
+    active: calendar.active,
+    source: calendar.source,
+    ics_url: calendar.source === 'ICS' ? 'https://example.invalid/calendar.ics' : `https://calendar.familie.dk/${calendar.name.toLowerCase()}`,
+  }).select('id').single()
+  if (error) throw error
+  return { ...calendar, id: data.id }
+}
+
+export async function updateCalendar(id: string, values: Partial<FamilyCalendar>) {
+  if (!supabase) return
+  const { error } = await supabase.from('calendars').update({
+    ...(values.name !== undefined ? { name: values.name } : {}),
+    ...(values.color !== undefined ? { color: values.color } : {}),
+    ...(values.active !== undefined ? { active: values.active } : {}),
+  }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCalendar(id: string) {
+  if (!supabase) return
+  const { error } = await supabase.from('calendars').delete().eq('id', id)
+  if (error) throw error
+}
